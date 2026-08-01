@@ -282,11 +282,11 @@
                 if (targetProv === 'BMA') {
                     const bmaList = ['BANGKOK', 'NONTHABURI', 'PATHUM THANI', 'SAMUT PRAKAN'];
                     matchedFeatures = thailandProvincesGeoJSON.features.filter(f => 
-                        bmaList.includes(f.properties.shapeName.replace('' Province', '').toUpperCase())
+                        bmaList.includes(f.properties.shapeName.replace(' Province', '').toUpperCase())
                     );
                 } else {
                     const matchedFeature = thailandProvincesGeoJSON.features.find(f => 
-                        f.properties.shapeName.replace('' Province', '').toUpperCase() === targetProv
+                        f.properties.shapeName.replace(' Province', '').toUpperCase() === targetProv
                     );
                     if (matchedFeature) {
                         matchedFeatures.push(matchedFeature);
