@@ -200,7 +200,8 @@
         const map = L.map('map', {
             center: [13.736717, 100.523186],
             zoom: 6,
-            zoomControl: false
+            zoomControl: false,
+            preferCanvas: true
         });
         
         L.control.zoom({ position: 'bottomright' }).addTo(map);
@@ -267,7 +268,74 @@
         map.addLayer(markers);
         
         let currentGeoJsonLayer = null;
+        let currentOltLayer = null;
         let currentProvinceBorderLayer = null;
+
+        
+        const geojsonOptions = {
+            pointToLayer: function (feature, latlng) {
+                const vendor = (feature.properties.vendor || '').toUpperCase();
+                const color = vendorColors[vendor] || vendorColors['DEFAULT'];
+                
+                const isOlt = feature.properties.type === 'OLT';
+                const size = isOlt ? 20 : 10;
+                const offset = isOlt ? 10 : 5;
+                const borderColor = isOlt ? '#b8860b' : '#ffffff';
+                const borderWidth = isOlt ? 3 : 2;
+                
+                return L.circleMarker(latlng, {
+                    radius: isOlt ? 10 : 5,
+                    fillColor: color,
+                    color: borderColor,
+                    weight: borderWidth,
+                    opacity: 1,
+                    fillOpacity: 1
+                });
+            },
+            onEachFeature: function (feature, layer) {
+                const p = feature.properties;
+                let popupContent = '';
+                if (p.type === 'OLT') {
+                    const util = p.ports > 0 ? Math.round((p.ports_use / p.ports) * 100) : 0;
+                    popupContent = `
+                        <div class="popup-title">${p.id}</div>
+                        <div class="popup-row">
+                            <span class="popup-label">Vendor</span>
+                            <span class="popup-value">${p.vendor || '-'} <span class="badge">OLT</span></span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Province</span>
+                            <span class="popup-value">${p.prov}</span>
+                        </div>
+                        <div style="margin-top:10px; border-top:1px solid rgba(0,0,0,0.08); padding-top:8px;">
+                            <div class="popup-row">
+                                <span class="popup-label">Ports Used</span>
+                                <span class="popup-value" style="color: ${util >= 80 ? '#e74c3c' : '#2ecc71'}; font-weight:bold;">
+                                    ${p.ports_use || 0} / ${p.ports || 0} (${util}%)
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    popupContent = `
+                        <div class="popup-title">${p.id}</div>
+                        <div class="popup-row">
+                            <span class="popup-label">OLT</span>
+                            <span class="popup-value">${p.olt || '-'}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Vendor</span>
+                            <span class="popup-value">${p.vendor || '-'}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Province</span>
+                            <span class="popup-value">${p.prov}</span>
+                        </div>
+                    `;
+                }
+                layer.bindPopup(popupContent);
+            }
+        };
 
         function renderMap(filterProv) {
             if (currentProvinceBorderLayer) {
@@ -310,184 +378,87 @@
                 if (currentGeoJsonLayer) {
                     markers.removeLayer(currentGeoJsonLayer);
                 }
+                if (currentOltLayer) {
+                    map.removeLayer(currentOltLayer);
+                }
                 
                 const filteredFeatures = geojsonData.features || [];
+                const splitters = filteredFeatures.filter(f => f.properties.type !== 'OLT');
+                const olts = filteredFeatures.filter(f => f.properties.type === 'OLT');
                 
-                currentGeoJsonLayer = L.geoJSON({ type: "FeatureCollection", features: filteredFeatures }, {
-                    pointToLayer: function (feature, latlng) {
-                        const vendor = (feature.properties.vendor || '').toUpperCase();
-                        const color = vendorColors[vendor] || vendorColors['DEFAULT'];
-                        
-                        const isOlt = feature.properties.type === 'OLT';
-                        const size = isOlt ? 16 : 10;
-                        const offset = isOlt ? 8 : 5;
-                        
-                        const customIcon = L.divIcon({
-                            className: 'custom-div-icon',
-                            html: `<div style="background-color:${color}; width:${size-4}px; height:${size-4}px; border-radius:50%; border:2px solid #ffffff; box-shadow: 0 0 10px ${color}80;"></div>`,
-                            iconSize: [size, size],
-                            iconAnchor: [offset, offset]
-                        });
-                        
-                        return L.marker(latlng, { icon: customIcon });
-                    },
-                    onEachFeature: function (feature, layer) {
-                        const p = feature.properties;
-                        let popupContent = '';
-                        if (p.type === 'OLT') {
-                            const util = p.ports > 0 ? Math.round((p.ports_use / p.ports) * 100) : 0;
-                            popupContent = `
-                                <div class="popup-title">${p.id}</div>
-                                <div class="popup-row">
-                                    <span class="popup-label">Vendor</span>
-                                    <span class="popup-value">${p.vendor || '-'} <span class="badge">OLT</span></span>
-                                </div>
-                                <div class="popup-row">
-                                    <span class="popup-label">Province</span>
-                                    <span class="popup-value">${p.prov}</span>
-                                </div>
-                                <div style="margin-top:10px; border-top:1px solid rgba(0,0,0,0.08); padding-top:8px;">
-                                    <div class="popup-row">
-                                        <span class="popup-label">Ports Used</span>
-                                        <span class="popup-value" style="color: ${util > 80 ? '#ef4444' : '#10b981'}">${p.ports_use} / ${p.ports} (${util}%)</span>
-                                    </div>
-                                </div>
-                            `;
-                        } else {
-                            popupContent = `
-                                <div class="popup-title">${p.id}</div>
-                                <div class="popup-row">
-                                    <span class="popup-label">Vendor</span>
-                                    <span class="popup-value">${p.vendor || '-'} <span class="badge">${p.type}</span></span>
-                                </div>
-                                <div class="popup-row">
-                                    <span class="popup-label">Parent OLT</span>
-                                    <span class="popup-value">${p.olt || '-'}</span>
-                                </div>
-                                <div class="popup-row">
-                                    <span class="popup-label">Province</span>
-                                    <span class="popup-value">${p.prov}</span>
-                                </div>
-                            `;
-                        }
-                        layer.bindPopup(popupContent);
-                    }
-                });
+                currentGeoJsonLayer = L.geoJSON({ type: "FeatureCollection", features: splitters }, geojsonOptions);
+                currentOltLayer = L.geoJSON({ type: "FeatureCollection", features: olts }, geojsonOptions);
                 
                 markers.addLayer(currentGeoJsonLayer);
-                document.getElementById('total-count').innerText = filteredFeatures.length.toLocaleString();
-                map.setView([13.736717, 100.523186], 6);
-                return;
-            }
-
-            const scriptUrl = `${encodeURIComponent(filterProv)}.js`;
-            
-            // Remove old script if exists
-            const oldScript = document.getElementById('prov-data-script');
-            if (oldScript) {
-                oldScript.remove();
-            }
-
-            const script = document.createElement('script');
-            script.id = 'prov-data-script';
-            script.src = scriptUrl;
-            script.onload = () => {
-                if (currentGeoJsonLayer) {
-                    markers.removeLayer(currentGeoJsonLayer);
-                }
+                map.addLayer(currentOltLayer);
                 
-                let filteredFeatures = [];
-                if (window.provinceData && window.provinceData.data) {
-                    const vendors = window.provinceData.vendors;
-                    const types = window.provinceData.types;
-                    const olts = window.provinceData.olts;
-                    filteredFeatures = window.provinceData.data.map(item => ({
-                        type: "Feature",
-                        geometry: { type: "Point", coordinates: [item[0], item[1]] },
-                        properties: {
-                            type: types[item[2]],
-                            id: item[3],
-                            olt: olts ? olts[item[4]] : item[4],
-                            vendor: vendors[item[5]],
-                            prov: ""
-                        }
-                    }));
-                }
-                
-                currentGeoJsonLayer = L.geoJSON({ type: "FeatureCollection", features: filteredFeatures }, {
-                    pointToLayer: function (feature, latlng) {
-                        const vendor = (feature.properties.vendor || '').toUpperCase();
-                        const color = vendorColors[vendor] || vendorColors['DEFAULT'];
-                        
-                        const isOlt = feature.properties.type === 'OLT';
-                        const size = isOlt ? 16 : 10;
-                        const offset = isOlt ? 8 : 5;
-                        
-                        const customIcon = L.divIcon({
-                            className: 'custom-div-icon',
-                            html: `<div style="background-color:${color}; width:${size-4}px; height:${size-4}px; border-radius:50%; border:2px solid #ffffff; box-shadow: 0 0 10px ${color}80;"></div>`,
-                            iconSize: [size, size],
-                            iconAnchor: [offset, offset]
-                        });
-                        
-                        return L.marker(latlng, { icon: customIcon });
-                    },
-                    onEachFeature: function (feature, layer) {
-                        const p = feature.properties;
-                        let popupContent = '';
-                        if (p.type === 'OLT') {
-                            const util = p.ports > 0 ? Math.round((p.ports_use / p.ports) * 100) : 0;
-                            popupContent = `
-                                <div class="popup-title">${p.id}</div>
-                                <div class="popup-row">
-                                    <span class="popup-label">Vendor</span>
-                                    <span class="popup-value">${p.vendor || '-'} <span class="badge">OLT</span></span>
-                                </div>
-                                <div class="popup-row">
-                                    <span class="popup-label">Province</span>
-                                    <span class="popup-value">${p.prov}</span>
-                                </div>
-                                <div style="margin-top:10px; border-top:1px solid rgba(0,0,0,0.08); padding-top:8px;">
-                                    <div class="popup-row">
-                                        <span class="popup-label">Ports Used</span>
-                                        <span class="popup-value" style="color: ${util > 80 ? '#ef4444' : '#10b981'}">${p.ports_use} / ${p.ports} (${util}%)</span>
-                                    </div>
-                                </div>
-                            `;
-                        } else {
-                            popupContent = `
-                                <div class="popup-title">${p.id}</div>
-                                <div class="popup-row">
-                                    <span class="popup-label">Vendor</span>
-                                    <span class="popup-value">${p.vendor || '-'} <span class="badge">${p.type}</span></span>
-                                </div>
-                                <div class="popup-row">
-                                    <span class="popup-label">Parent OLT</span>
-                                    <span class="popup-value">${p.olt || '-'}</span>
-                                </div>
-                                <div class="popup-row">
-                                    <span class="popup-label">Province</span>
-                                    <span class="popup-value">${p.prov}</span>
-                                </div>
-                            `;
-                        }
-                        layer.bindPopup(popupContent);
-                    }
-                });
-                
-                markers.addLayer(currentGeoJsonLayer);
                 document.getElementById('total-count').innerText = filteredFeatures.length.toLocaleString();
                 
-                if (currentGeoJsonLayer.getLayers().length > 0) {
+                if (currentGeoJsonLayer.getLayers().length > 0 || currentOltLayer.getLayers().length > 0) {
                     map.fitBounds(markers.getBounds(), { padding: [50, 50] });
                 }
-            };
-            
-            script.onerror = () => {
-                alert('No data found for ' + filterProv);
-            };
-            
-            document.body.appendChild(script);
+            } else {
+                const targetProv = filterProv.toUpperCase();
+                const scriptUrl = encodeURIComponent(targetProv) + '.js';
+                
+                const oldScript = document.getElementById('prov-data-script');
+                if (oldScript) {
+                    oldScript.remove();
+                }
+
+                const script = document.createElement('script');
+                script.id = 'prov-data-script';
+                script.src = scriptUrl;
+                script.onload = () => {
+                    if (currentGeoJsonLayer) {
+                        markers.removeLayer(currentGeoJsonLayer);
+                    }
+                    if (currentOltLayer) {
+                        map.removeLayer(currentOltLayer);
+                    }
+                    
+                    let filteredFeatures = [];
+                    if (window.provinceData && window.provinceData.data) {
+                        const vendors = window.provinceData.vendors;
+                        const types = window.provinceData.types;
+                        const oltsList = window.provinceData.olts;
+                        filteredFeatures = window.provinceData.data.map(item => ({
+                            type: "Feature",
+                            geometry: { type: "Point", coordinates: [item[0], item[1]] },
+                            properties: {
+                                type: types[item[2]],
+                                id: item[3],
+                                olt: oltsList ? oltsList[item[4]] : item[4],
+                                vendor: vendors[item[5]],
+                                prov: ""
+                            }
+                        }));
+                    }
+                    
+                    const splitters = filteredFeatures.filter(f => f.properties.type !== 'OLT');
+                    const olts = filteredFeatures.filter(f => f.properties.type === 'OLT');
+                    
+                    currentGeoJsonLayer = L.geoJSON({ type: "FeatureCollection", features: splitters }, geojsonOptions);
+                    currentOltLayer = L.geoJSON({ type: "FeatureCollection", features: olts }, geojsonOptions);
+                    
+                    markers.addLayer(currentGeoJsonLayer);
+                    map.addLayer(currentOltLayer);
+                    
+                    document.getElementById('total-count').innerText = filteredFeatures.length.toLocaleString();
+                    
+                    if (currentProvinceBorderLayer) {
+                        map.fitBounds(currentProvinceBorderLayer.getBounds(), { padding: [50, 50] });
+                    } else if (currentGeoJsonLayer.getLayers().length > 0 || currentOltLayer.getLayers().length > 0) {
+                        map.fitBounds(markers.getBounds(), { padding: [50, 50] });
+                    }
+                };
+                
+                script.onerror = () => {
+                    alert('No data found for ' + filterProv);
+                };
+                
+                document.body.appendChild(script);
+            }
         }
         
         // Dropdown listener
