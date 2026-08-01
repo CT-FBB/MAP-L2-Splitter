@@ -42,6 +42,8 @@ def main():
                     prov = 'UNKNOWN'
                 if prov in ["BANGKOK", "NONTHABURI", "PATHUM THANI", "SAMUT PRAKAN"]:
                     prov = 'BMA'
+                elif prov in ['CHACHOENGSAO', 'CHON BURI', 'RAYONG']:
+                    prov = 'EEC'
                 olt_vendors[k] = vendor
                 
                 if prov not in prov_features:
@@ -95,6 +97,8 @@ def main():
                 prov = 'UNKNOWN'
             if prov in ["BANGKOK", "NONTHABURI", "PATHUM THANI", "SAMUT PRAKAN"]:
                 prov = 'BMA'
+            elif prov in ['CHACHOENGSAO', 'CHON BURI', 'RAYONG']:
+                prov = 'EEC'
                 
             vendor = olt_vendors.get(olt, 'UNKNOWN')
             
