@@ -420,7 +420,7 @@
                 }
             } else {
                 const targetProv = filterProv.toUpperCase();
-                const scriptUrl = 'provinces_data/' + encodeURIComponent(targetProv) + '.js?v=' + new Date().getTime();
+                const scriptUrl = '' + encodeURIComponent(targetProv) + '.js?v=' + new Date().getTime();
                 
                 const oldScript = document.getElementById('prov-data-script');
                 if (oldScript) {
