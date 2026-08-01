@@ -20,6 +20,7 @@ def main():
     olts_list = []
     
     def get_vendor_idx(v):
+        v = str(v).strip().upper()
         if v not in vendors_list:
             vendors_list.append(v)
         return vendors_list.index(v)
@@ -31,12 +32,53 @@ def main():
         if o not in olts_list:
             olts_list.append(o)
         return olts_list.index(o)
-    
+        
+    # --- LOAD DEVICE MAPPING (For Vendor) ---
+    device_vendors = {}
+    device_files = sorted(glob.glob(os.path.join(BASE_DIR, '**', 'Device*.xlsx'), recursive=True), key=os.path.getmtime, reverse=True)
+    if device_files:
+        latest_device = device_files[0]
+        print(f"Loading vendors from {latest_device} ...")
+        try:
+            df_dev = pd.read_excel(latest_device, usecols=['Device Name', 'Vendor'])
+            for _, row in df_dev.iterrows():
+                dev_name = str(row.get('Device Name', '')).strip().replace('GO', 'G0').upper()
+                vendor = str(row.get('Vendor', '')).strip().upper()
+                if dev_name and dev_name != 'NAN' and vendor and vendor != 'NAN':
+                    device_vendors[dev_name] = vendor
+        except Exception as e:
+            print(f"Error reading {latest_device}: {e}")
+    else:
+        print("No Device*.xlsx file found for vendor mapping!")
+
+    # --- LOAD ODN MAPPING (For Linkage) ---
+    odn_mapping = {}
+    odn_files = sorted(glob.glob(os.path.join(BASE_DIR, '**', 'ODN*.xlsx'), recursive=True), key=os.path.getmtime, reverse=True)
+    if odn_files:
+        latest_odn = odn_files[0]
+        print(f"Loading linkage from {latest_odn} ...")
+        df_odn = pd.read_excel(latest_odn, usecols=['Device', 'L1 Name', 'L2 Name'])
+        for _, row in df_odn.iterrows():
+            dev = str(row.get('Device', '')).strip().replace('GO', 'G0').upper()
+            if not dev or pd.isna(dev) or dev == 'NAN': continue
+            
+            l1 = str(row.get('L1 Name', '')).strip()
+            l2 = str(row.get('L2 Name', '')).strip()
+            
+            if l1 and l1 != 'nan':
+                odn_mapping[l1] = dev
+            if l2 and l2 != 'nan':
+                odn_mapping[l2] = dev
+    else:
+        print("No ODN*.xlsx file found for linkage!")
+
+    # --- PROCESS OLT MASTER JSON ---
     if os.path.exists(OLT_JSON):
         with open(OLT_JSON, 'r', encoding='utf-8') as f:
             olt_data = json.load(f)
             for k, v in olt_data.items():
-                vendor = v.get('vendor', 'UNKNOWN')
+                # Get vendor from Device mapping first, fallback to JSON
+                vendor = device_vendors.get(k, v.get('vendor', 'UNKNOWN'))
                 prov = str(v.get('prov', '')).strip().upper()
                 if not prov or prov.lower() == 'nan':
                     prov = 'UNKNOWN'
@@ -58,6 +100,7 @@ def main():
                     get_vendor_idx(vendor)
                 ])
 
+    # --- PROCESS SPLITTER L1 & L2 ---
     for ftype, ptn in [('L1', 'FTTH_L1*.xlsx'), ('L2', 'FTTH_L2*.xlsx')]:
         files = sorted(glob.glob(os.path.join(BASE_DIR, ptn)), key=os.path.getmtime, reverse=True)
         if not files:
@@ -91,7 +134,12 @@ def main():
             if not sp_id or pd.isna(sp_id) or sp_id == 'nan':
                 continue
                 
-            olt = str(row.get('OLT', '')).strip().replace('GO', 'G0').upper()
+            # 1. Try to get OLT linkage from ODN file
+            olt = odn_mapping.get(sp_id)
+            # 2. Fallback to FTTH Excel file if not found in ODN
+            if not olt:
+                olt = str(row.get('OLT', '')).strip().replace('GO', 'G0').upper()
+                
             prov = str(row.get('PROVINCE', '')).strip().upper()
             if not prov or prov.lower() == 'nan':
                 prov = 'UNKNOWN'
@@ -100,7 +148,8 @@ def main():
             elif prov in ['CHACHOENGSAO', 'CHON BURI', 'RAYONG']:
                 prov = 'EEC'
                 
-            vendor = olt_vendors.get(olt, 'UNKNOWN')
+            # Vendor lookup falls back to UNKNOWN if OLT is not in olt_vendors mapping
+            vendor = olt_vendors.get(olt, device_vendors.get(olt, 'UNKNOWN'))
             
             if prov not in prov_features:
                 prov_features[prov] = []
@@ -114,6 +163,7 @@ def main():
                 get_vendor_idx(vendor)
             ])
 
+    # --- SAVE TO JS FILES ---
     for prov, features in prov_features.items():
         out_file = os.path.join(PROV_DIR, f"{prov}.js")
         out_data = {
