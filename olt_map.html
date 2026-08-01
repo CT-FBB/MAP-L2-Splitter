@@ -307,14 +307,10 @@
                 if (p.type === 'OLT') {
                     const util = p.ports > 0 ? Math.round((p.ports_use / p.ports) * 100) : 0;
                     popupContent = `
-                        <div class="popup-title">${p.id}</div>
+                        <div class="popup-title">${p.type} : ${p.id}</div>
                         <div class="popup-row">
                             <span class="popup-label">Vendor</span>
-                            <span class="popup-value">${p.vendor || '-'} <span class="badge">OLT</span></span>
-                        </div>
-                        <div class="popup-row">
-                            <span class="popup-label">Province</span>
-                            <span class="popup-value">${p.prov}</span>
+                            <span class="popup-value">${p.vendor || '-'}</span>
                         </div>
                         <div style="margin-top:10px; border-top:1px solid rgba(0,0,0,0.08); padding-top:8px;">
                             <div class="popup-row">
@@ -327,7 +323,7 @@
                     `;
                 } else {
                     popupContent = `
-                        <div class="popup-title">${p.id}</div>
+                        <div class="popup-title">${p.type} : ${p.id}</div>
                         <div class="popup-row">
                             <span class="popup-label">OLT</span>
                             <span class="popup-value">${p.olt || '-'}</span>
@@ -335,10 +331,6 @@
                         <div class="popup-row">
                             <span class="popup-label">Vendor</span>
                             <span class="popup-value">${p.vendor || '-'}</span>
-                        </div>
-                        <div class="popup-row">
-                            <span class="popup-label">Province</span>
-                            <span class="popup-value">${p.prov}</span>
                         </div>
                     `;
                 }
