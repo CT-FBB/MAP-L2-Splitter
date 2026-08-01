@@ -116,6 +116,22 @@ def main():
         
         id_col = 'SPTL1' if ftype == 'L1' else 'SPTL2'
         
+        # --- DYNAMIC PREFIX MAPPING (Fix Outliers) ---
+        df_sp = df[id_col].astype(str).str.strip()
+        df_pfx = df_sp.str[:3].str.upper()
+        
+        # Only consider rows where prefix is alpha and province is not null
+        valid_mask = df_pfx.str.isalpha() & df['PROVINCE'].notna() & (df['PROVINCE'].astype(str).str.strip().str.upper() != 'NAN')
+        df_valid = df[valid_mask].copy()
+        df_valid['PREFIX'] = df_pfx[valid_mask]
+        df_valid['PROV_UPPER'] = df_valid['PROVINCE'].astype(str).str.strip().str.upper()
+        
+        # Get the most common province (mode) for each 3-letter prefix
+        prefix_to_prov = {}
+        if not df_valid.empty:
+            mode_df = df_valid.groupby('PREFIX')['PROV_UPPER'].agg(lambda x: x.mode().iloc[0] if not x.mode().empty else None)
+            prefix_to_prov = mode_df.dropna().to_dict()
+        
         records = df.to_dict('records')
         for row in records:
             lat = row.get('LATITUDE')
@@ -139,10 +155,17 @@ def main():
             # 2. Fallback to FTTH Excel file if not found in ODN
             if not olt:
                 olt = str(row.get('OLT', '')).strip().replace('GO', 'G0').upper()
+            
+            # Use dynamic prefix mapping first, then fallback to original column
+            prefix = sp_id[:3].upper()
+            if len(prefix) == 3 and prefix.isalpha() and prefix in prefix_to_prov:
+                prov = prefix_to_prov[prefix]
+            else:
+                prov = str(row.get('PROVINCE', '')).strip().upper()
                 
-            prov = str(row.get('PROVINCE', '')).strip().upper()
             if not prov or prov.lower() == 'nan':
                 prov = 'UNKNOWN'
+                
             if prov in ["BANGKOK", "NONTHABURI", "PATHUM THANI", "SAMUT PRAKAN"]:
                 prov = 'BMA'
             elif prov in ['CHACHOENGSAO', 'CHON BURI', 'RAYONG']:
