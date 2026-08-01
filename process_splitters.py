@@ -6,7 +6,7 @@ import math
 
 BASE_DIR = '/Users/bbae/GPTCodex'
 LOCATION_DIR = '/Users/bbae/GPTCodex/OLT-Location'
-PROV_DIR = os.path.join(LOCATION_DIR, 'L2Location')
+PROV_DIR = os.path.join(LOCATION_DIR, 'provinces_data')
 OLT_JSON = os.path.join(LOCATION_DIR, 'GIT-LOCATION', 'olt_location_data.json')
 
 os.makedirs(PROV_DIR, exist_ok=True)
@@ -72,6 +72,28 @@ def main():
     else:
         print("No ODN*.xlsx file found for linkage!")
 
+    # --- GATHER DYNAMIC PREFIX MAPPING FROM L1 & L2 ---
+    prefix_to_prov = {}
+    print("Building prefix-to-province mapping from L1/L2 files...")
+    for ftype, ptn in [('L1', 'FTTH_L1*.xlsx'), ('L2', 'FTTH_L2*.xlsx')]:
+        files = sorted(glob.glob(os.path.join(BASE_DIR, ptn)), key=os.path.getmtime, reverse=True)
+        if not files:
+            files = sorted(glob.glob(os.path.join(BASE_DIR, 'SPL', 'TOL_Network_*', ptn)), key=os.path.getmtime, reverse=True)
+        if files:
+            df = pd.read_excel(files[0], usecols=['SPTL1' if ftype == 'L1' else 'SPTL2', 'PROVINCE'])
+            id_col = 'SPTL1' if ftype == 'L1' else 'SPTL2'
+            df_sp = df[id_col].astype(str).str.strip()
+            df_pfx = df_sp.str[:3].str.upper()
+            valid_mask = df_pfx.str.isalpha() & df['PROVINCE'].notna() & (df['PROVINCE'].astype(str).str.strip().str.upper() != 'NAN')
+            df_valid = df[valid_mask].copy()
+            df_valid['PREFIX'] = df_pfx[valid_mask]
+            df_valid['PROV_UPPER'] = df_valid['PROVINCE'].astype(str).str.strip().str.upper()
+            if not df_valid.empty:
+                mode_df = df_valid.groupby('PREFIX')['PROV_UPPER'].agg(lambda x: x.mode().iloc[0] if not x.mode().empty else None)
+                for k, v in mode_df.dropna().to_dict().items():
+                    if k not in prefix_to_prov:
+                        prefix_to_prov[k] = v
+
     # --- PROCESS OLT MASTER JSON ---
     if os.path.exists(OLT_JSON):
         with open(OLT_JSON, 'r', encoding='utf-8') as f:
@@ -79,7 +101,11 @@ def main():
             for k, v in olt_data.items():
                 # Get vendor from Device mapping first, fallback to JSON
                 vendor = device_vendors.get(k, v.get('vendor', 'UNKNOWN'))
+                
+                # OLT uses province from JSON directly (NOT prefix mapping)
+                # Prefix mapping is only for Splitters
                 prov = str(v.get('prov', '')).strip().upper()
+                    
                 if not prov or prov.lower() == 'nan':
                     prov = 'UNKNOWN'
                 if prov in ["BANGKOK", "NONTHABURI", "PATHUM THANI", "SAMUT PRAKAN"]:
@@ -97,7 +123,9 @@ def main():
                     get_type_idx("OLT"), 
                     k, 
                     get_olt_idx(k), 
-                    get_vendor_idx(vendor)
+                    get_vendor_idx(vendor),
+                    int(v.get("ports_use", 0)),
+                    int(v.get("ports", 0))
                 ])
 
     # --- PROCESS SPLITTER L1 & L2 ---
@@ -117,21 +145,6 @@ def main():
         id_col = 'SPTL1' if ftype == 'L1' else 'SPTL2'
         
         # --- DYNAMIC PREFIX MAPPING (Fix Outliers) ---
-        df_sp = df[id_col].astype(str).str.strip()
-        df_pfx = df_sp.str[:3].str.upper()
-        
-        # Only consider rows where prefix is alpha and province is not null
-        valid_mask = df_pfx.str.isalpha() & df['PROVINCE'].notna() & (df['PROVINCE'].astype(str).str.strip().str.upper() != 'NAN')
-        df_valid = df[valid_mask].copy()
-        df_valid['PREFIX'] = df_pfx[valid_mask]
-        df_valid['PROV_UPPER'] = df_valid['PROVINCE'].astype(str).str.strip().str.upper()
-        
-        # Get the most common province (mode) for each 3-letter prefix
-        prefix_to_prov = {}
-        if not df_valid.empty:
-            mode_df = df_valid.groupby('PREFIX')['PROV_UPPER'].agg(lambda x: x.mode().iloc[0] if not x.mode().empty else None)
-            prefix_to_prov = mode_df.dropna().to_dict()
-        
         records = df.to_dict('records')
         for row in records:
             lat = row.get('LATITUDE')
@@ -156,12 +169,16 @@ def main():
             if not olt:
                 olt = str(row.get('OLT', '')).strip().replace('GO', 'G0').upper()
             
-            # Use dynamic prefix mapping first, then fallback to original column
-            prefix = sp_id[:3].upper()
-            if len(prefix) == 3 and prefix.isalpha() and prefix in prefix_to_prov:
-                prov = prefix_to_prov[prefix]
+            # Handle exception for SMPPRI which stands for Si Maha Phot, Prachin Buri (not Samut Prakan)
+            if sp_id.upper().startswith('SMPPRI'):
+                prov = 'PRACHIN BURI'
             else:
-                prov = str(row.get('PROVINCE', '')).strip().upper()
+                # Use dynamic prefix mapping first, then fallback to original column
+                prefix = sp_id[:3].upper()
+                if len(prefix) == 3 and prefix.isalpha() and prefix in prefix_to_prov:
+                    prov = prefix_to_prov[prefix]
+                else:
+                    prov = str(row.get('PROVINCE', '')).strip().upper()
                 
             if not prov or prov.lower() == 'nan':
                 prov = 'UNKNOWN'
@@ -200,7 +217,7 @@ def main():
             json.dump(out_data, f, ensure_ascii=False, separators=(',', ':'))
             f.write(";")
             
-    print(f"Saved {len(prov_features)} province JS files.")
+    print(f"Saved {len(prov_features)} province JS files to {PROV_DIR}.")
 
 if __name__ == '__main__':
     main()
