@@ -172,7 +172,9 @@
                 * Please select a province to view L1/L2 Splitters.
             </div>
         </div>
-        <div>
+        <div style="display: flex; align-items: center;">
+            <input type="text" id="search-input" placeholder="Search OLT / L1 / L2..." style="padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; font-family: 'Outfit', sans-serif; font-size: 1rem; color: #0f172a; outline: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-right: 8px;" onkeypress="if(event.key === 'Enter') searchFeature()">
+            <button onclick="searchFeature()" style="padding: 8px 16px; border-radius: 8px; background: var(--accent); color: white; border: none; cursor: pointer; font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 500; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-right: 16px; transition: 0.2s;" onmouseover="this.style.background='var(--accent-hover)'" onmouseout="this.style.background='var(--accent)'">Search</button>
             <select id="province-select" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; font-family: 'Outfit', sans-serif; font-size: 1rem; color: #0f172a; outline: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); background-color: #ffffff; cursor: pointer;">
                 <option value="ALL">All Provinces (OLT Only)</option><option value="BLINDSPOT">Clustering Blind Spot</option><option value="AMNAT CHAROEN">AMNAT CHAROEN</option><option value="ANG THONG">ANG THONG</option><option value="BMA">BMA</option><option value="EEC">EEC</option><option value="BUENG KAN">BUENG KAN</option><option value="BURI RAM">BURI RAM</option><option value="CHAI NAT">CHAI NAT</option><option value="CHAIYAPHUM">CHAIYAPHUM</option><option value="CHANTHABURI">CHANTHABURI</option><option value="CHIANG MAI">CHIANG MAI</option><option value="CHIANG RAI">CHIANG RAI</option><option value="CHUMPHON">CHUMPHON</option><option value="KALASIN">KALASIN</option><option value="KAMPHAENG PHET">KAMPHAENG PHET</option><option value="KANCHANABURI">KANCHANABURI</option><option value="KHON KAEN">KHON KAEN</option><option value="KRABI">KRABI</option><option value="LAMPANG">LAMPANG</option><option value="LAMPHUN">LAMPHUN</option><option value="LOEI">LOEI</option><option value="LOP BURI">LOP BURI</option><option value="MAE HONG SON">MAE HONG SON</option><option value="MAHA SARAKHAM">MAHA SARAKHAM</option><option value="MUKDAHAN">MUKDAHAN</option><option value="NAKHON NAYOK">NAKHON NAYOK</option><option value="NAKHON PATHOM">NAKHON PATHOM</option><option value="NAKHON PHANOM">NAKHON PHANOM</option><option value="NAKHON RATCHASIMA">NAKHON RATCHASIMA</option><option value="NAKHON SAWAN">NAKHON SAWAN</option><option value="NAKHON SI THAMMARAT">NAKHON SI THAMMARAT</option><option value="NARATHIWAT">NARATHIWAT</option><option value="NONG BUA LAM PHU">NONG BUA LAM PHU</option><option value="NONG KHAI">NONG KHAI</option><option value="PATTANI">PATTANI</option><option value="PHANGNGA">PHANGNGA</option><option value="PHATTHALUNG">PHATTHALUNG</option><option value="PHAYAO">PHAYAO</option><option value="PHETCHABUN">PHETCHABUN</option><option value="PHETCHABURI">PHETCHABURI</option><option value="PHICHIT">PHICHIT</option><option value="PHITSANULOK">PHITSANULOK</option><option value="PHRA NAKHON SI AYUTTHAYA">PHRA NAKHON SI AYUTTHAYA</option><option value="PHRAE">PHRAE</option><option value="PHUKET">PHUKET</option><option value="PRACHIN BURI">PRACHIN BURI</option><option value="PRACHUAP KHIRI KHAN">PRACHUAP KHIRI KHAN</option><option value="RANONG">RANONG</option><option value="RATCHABURI">RATCHABURI</option><option value="ROI ET">ROI ET</option><option value="SA KAEO">SA KAEO</option><option value="SAKON NAKHON">SAKON NAKHON</option><option value="SAMUT SAKHON">SAMUT SAKHON</option><option value="SAMUT SONGKHRAM">SAMUT SONGKHRAM</option><option value="SARABURI">SARABURI</option><option value="SATUN">SATUN</option><option value="SI SA KET">SI SA KET</option><option value="SING BURI">SING BURI</option><option value="SONGKHLA">SONGKHLA</option><option value="SUKHOTHAI">SUKHOTHAI</option><option value="SUPHAN BURI">SUPHAN BURI</option><option value="SURAT THANI">SURAT THANI</option><option value="SURIN">SURIN</option><option value="TAK">TAK</option><option value="TRANG">TRANG</option><option value="TRAT">TRAT</option><option value="UBON RATCHATHANI">UBON RATCHATHANI</option><option value="UDON THANI">UDON THANI</option><option value="UNKNOWN">UNKNOWN</option><option value="UTHAI THANI">UTHAI THANI</option><option value="UTTARADIT">UTTARADIT</option><option value="YALA">YALA</option><option value="YASOTHON">YASOTHON</option>
             </select>
@@ -501,6 +503,46 @@
         // Fit bounds to all markers on initial load
         if (geojsonData.features.length > 0) {
             map.fitBounds(markers.getBounds(), { padding: [50, 50] });
+        }
+        
+        function searchFeature() {
+            const val = document.getElementById('search-input').value.trim().toUpperCase();
+            if (!val) return;
+            
+            let foundLayers = [];
+            
+            if (typeof currentOltLayer !== 'undefined' && currentOltLayer) {
+                currentOltLayer.eachLayer(function(layer) {
+                    if (layer.feature && layer.feature.properties && layer.feature.properties.id && layer.feature.properties.id.toUpperCase().includes(val)) {
+                        foundLayers.push({layer: layer, type: 'olt'});
+                    }
+                });
+            }
+            
+            if (typeof currentGeoJsonLayer !== 'undefined' && currentGeoJsonLayer) {
+                currentGeoJsonLayer.eachLayer(function(layer) {
+                    if (layer.feature && layer.feature.properties && layer.feature.properties.id && layer.feature.properties.id.toUpperCase().includes(val)) {
+                        foundLayers.push({layer: layer, type: 'splitter'});
+                    }
+                });
+            }
+            
+            if (foundLayers.length > 0) {
+                let target = foundLayers.find(item => item.layer.feature.properties.id.toUpperCase() === val) || foundLayers[0];
+                
+                if (target.type === 'olt') {
+                    map.flyTo(target.layer.getLatLng(), 17);
+                    setTimeout(() => target.layer.openPopup(), 1000);
+                } else {
+                    if (typeof markers !== 'undefined' && markers) {
+                        markers.zoomToShowLayer(target.layer, function() {
+                            target.layer.openPopup();
+                        });
+                    }
+                }
+            } else {
+                alert('Not found: ' + val + '\\n(Make sure you have selected the correct province)');
+            }
         }
     </script>
 </body>
