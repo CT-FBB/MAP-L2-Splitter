@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dominant L2 Vendor by Province</title>
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- GeoJSON and Data -->
+    <script src="thailand_provinces_border.js?v=2"></script>
+    <script src="l2_vendor_summary.js?v=7"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg: #fefaf0;
+            --text: #0f172a;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #map {
+            flex: 1;
+            width: 100%;
+            background-color: #fefaf0;
+        }
+        
+        /* Custom Info Control */
+        .info {
+            position: absolute;
+            bottom: 290px;
+            left: 30px;
+            z-index: 1000;
+            padding: 12px 16px;
+            font: 14px/16px 'Outfit', sans-serif;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            color: #333;
+            min-width: 250px;
+        }
+        .info h4 {
+            margin: 0 0 10px;
+            color: #111;
+            font-size: 16px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        
+        /* Legend */
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+        }
+        .legend-title {
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 5px;
+            color: #1e293b;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: #475569;
+            font-weight: 500;
+        }
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="info-box" class="info"></div>
+    <div class="legend">
+        <div class="legend-title">Vendor Colors</div>
+        <div class="legend-item"><div class="legend-color" style="background-color: #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.8);"></div>HUAWEI</div>
+        <div class="legend-item"><div class="legend-color" style="background-color: #3b82f6; box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);"></div>ZTE</div>
+        <div class="legend-item"><div class="legend-color" style="background-color: #f97316; box-shadow: 0 0 10px rgba(249, 115, 22, 0.8);"></div>NOKIA</div>
+        <div class="legend-item"><div class="legend-color" style="background-color: #22c55e; box-shadow: 0 0 10px rgba(34, 197, 94, 0.8);"></div>FIBERHOME</div>
+        <div class="legend-item"><div class="legend-color" style="background-color: #a855f7; box-shadow: 0 0 10px rgba(168, 85, 247, 0.8);"></div>DASAN</div>
+        <div class="legend-item"><div class="legend-color" style="background-color: #eab308; box-shadow: 0 0 10px rgba(234, 179, 8, 0.8);"></div>GCOM</div>
+        <div class="legend-item"><div class="legend-color" style="background-color: #06b6d4; box-shadow: 0 0 10px rgba(6, 182, 212, 0.8);"></div>RAISECOM</div>
+        <div class="legend-item"><div class="legend-color" style="background-color: #94a3b8; box-shadow: 0 0 10px rgba(148, 163, 184, 0.8);"></div>UNKNOWN</div>
+    </div>
+
+    <script>
+        const vendorColors = {
+            'HUAWEI': '#ef4444',
+            'ZTE': '#3b82f6',
+            'NOKIA': '#f97316',
+            'FIBERHOME': '#22c55e',
+            'DASAN': '#a855f7',
+            'GCOM': '#eab308',
+            'RAISECOM': '#06b6d4',
+            'UNKNOWN': '#94a3b8'
+        };
+
+        function getVendorColor(vendor) {
+            for (let v in vendorColors) {
+                if (vendor && vendor.toUpperCase().includes(v)) {
+                    return vendorColors[v];
+                }
+            }
+            return '#7f8c8d'; // Default fallback
+        }
+
+        const map = L.map('map').setView([13.736717, 100.523186], 6);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+
+        let geojson;
+        const infoBox = document.getElementById('info-box');
+
+        function updateInfo(props) {
+            if (!props) {
+                infoBox.innerHTML = '<h4>Dominant L2 Vendor</h4>Hover over a province';
+                return;
+            }
+
+            let provName = props.shapeName.replace(' Province', '').toUpperCase();
+            
+            // Map special provinces
+            let lookupName = provName;
+            if (['BANGKOK', 'NONTHABURI', 'PATHUM THANI', 'SAMUT PRAKAN'].includes(provName)) {
+                lookupName = 'BMA';
+            } else if (['CHACHOENGSAO', 'CHON BURI', 'RAYONG'].includes(provName)) {
+                lookupName = 'EEC';
+            }
+
+            let html = `<h4>${props.shapeName}</h4>`;
+            
+            // Normalize keys to ignore spaces
+            let normalizedSummary = {};
+            if (typeof window.l2VendorSummary !== 'undefined') {
+                for (let k in window.l2VendorSummary) {
+                    normalizedSummary[k.replace(/\s+/g, '')] = window.l2VendorSummary[k];
+                }
+            }
+            
+            let normalizedLookup = lookupName.replace(/\s+/g, '');
+            
+            if (normalizedSummary[normalizedLookup]) {
+                const summary = normalizedSummary[normalizedLookup];
+                const vendorColor = getVendorColor(summary.dominant_vendor);
+                
+                html += `<b>Dominant: <span style="color:${vendorColor}; font-weight:bold;">${summary.dominant_vendor}</span></b><br />`;
+                html += `${summary.percentage}% of L2 Splitters<br />`;
+                html += `(${summary.dominant_count.toLocaleString()} / ${summary.total_l2.toLocaleString()})<br /><br />`;
+                
+                html += `<div style="font-size:0.85em; color:#666;">All Vendors:</div>`;
+                const sortedVendors = Object.entries(summary.all_counts).sort((a, b) => b[1] - a[1]);
+                for (let [v, count] of sortedVendors) {
+                    html += `<div style="font-size:0.85em; display:flex; justify-content:space-between;">
+                        <span>${v}:</span> <span>${count.toLocaleString()}</span>
+                    </div>`;
+                }
+            } else {
+                html += 'No data available';
+            }
+            
+            infoBox.innerHTML = html;
+        }
+
+        updateInfo(); // Initialize
+
+        function style(feature) {
+            let provName = feature.properties.shapeName.replace(' Province', '').toUpperCase();
+            let lookupName = provName;
+            if (['BANGKOK', 'NONTHABURI', 'PATHUM THANI', 'SAMUT PRAKAN'].includes(provName)) {
+                lookupName = 'BMA';
+            } else if (['CHACHOENGSAO', 'CHON BURI', 'RAYONG'].includes(provName)) {
+                lookupName = 'EEC';
+            }
+
+            let fillColor = '#ffffff'; // default
+            let fillOpacity = 0.1;
+
+            let normalizedSummary = {};
+            if (typeof window.l2VendorSummary !== 'undefined') {
+                for (let k in window.l2VendorSummary) {
+                    normalizedSummary[k.replace(/\s+/g, '')] = window.l2VendorSummary[k];
+                }
+            }
+            
+            let normalizedLookup = lookupName.replace(/\s+/g, '');
+
+            if (normalizedSummary[normalizedLookup]) {
+                const summary = normalizedSummary[normalizedLookup];
+                fillColor = getVendorColor(summary.dominant_vendor);
+                fillOpacity = 0.7; // highlight
+            }
+
+            return {
+                fillColor: fillColor,
+                weight: 1,
+                opacity: 1,
+                color: '#aaaaaa',
+                fillOpacity: fillOpacity
+            };
+        }
+
+        function highlightFeature(e) {
+            var layer = e.target;
+
+            layer.setStyle({
+                weight: 3,
+                color: '#666',
+                dashArray: '',
+                fillOpacity: 0.9
+            });
+
+            layer.bringToFront();
+            updateInfo(layer.feature.properties);
+        }
+
+        function resetHighlight(e) {
+            geojson.resetStyle(e.target);
+            updateInfo();
+        }
+
+        function zoomToFeature(e) {
+            map.fitBounds(e.target.getBounds());
+        }
+
+        function onEachFeature(feature, layer) {
+            layer.on({
+                mouseover: highlightFeature,
+                mouseout: resetHighlight,
+                click: zoomToFeature
+            });
+        }
+
+        if (typeof thailandProvincesGeoJSON !== 'undefined') {
+            geojson = L.geoJson(thailandProvincesGeoJSON, {
+                style: style,
+                onEachFeature: onEachFeature
+            }).addTo(map);
+            
+            map.fitBounds(geojson.getBounds());
+        }
+
+
+
+        // Fix Leaflet map rendering when iframe becomes visible
+        const resizeObserver = new ResizeObserver(() => {
+            map.invalidateSize();
+            if (geojson) {
+                map.fitBounds(geojson.getBounds());
+            }
+        });
+        resizeObserver.observe(document.getElementById('map'));
+
+    </script>
+</body>
+</html>
