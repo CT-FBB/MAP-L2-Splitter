@@ -157,6 +157,8 @@
                 lookupName = 'BMA';
             } else if (['CHACHOENGSAO', 'CHON BURI', 'RAYONG'].includes(provName)) {
                 lookupName = 'EEC';
+            } else if (provName === 'NAAN') {
+                lookupName = 'NAN'; // GeoJSON spells Nan as 'Naan'
             }
 
             let html = `<h4>${props.shapeName}</h4>`;
@@ -202,6 +204,8 @@
                 lookupName = 'BMA';
             } else if (['CHACHOENGSAO', 'CHON BURI', 'RAYONG'].includes(provName)) {
                 lookupName = 'EEC';
+            } else if (provName === 'NAAN') {
+                lookupName = 'NAN'; // GeoJSON spells Nan as 'Naan'
             }
 
             let fillColor = '#ffffff'; // default
