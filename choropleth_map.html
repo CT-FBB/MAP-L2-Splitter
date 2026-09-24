@@ -10,8 +10,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <!-- GeoJSON and Data -->
-    <script src="thailand_provinces_border.js?v=3"></script>
-    <script src="l2_vendor_summary.js?v=7"></script>
+    <script src="thailand_provinces_border.js?v=20260924"></script>
+    <script src="l2_vendor_summary.js?v=20260924"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700&display=swap" rel="stylesheet">
     
@@ -97,6 +97,10 @@
     </style>
 </head>
 <body>
+    <div style="position: absolute; top: 16px; left: 60px; z-index: 1000; background: rgba(255, 255, 255, 0.88); backdrop-filter: blur(10px); padding: 8px 18px; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.08); box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 12px;">
+        <span style="font-weight: 700; font-size: 1.05rem; color: #1e293b;">Dominant L2 Vendor by Province</span>
+        <span style="background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); color: #2563eb; padding: 3px 12px; border-radius: 20px; font-size: 0.8rem; font-family: 'Outfit', sans-serif; font-weight: 600; letter-spacing: 0.04em;">📅 AS OF 24/09/26</span>
+    </div>
     <div id="map"></div>
     <div id="info-box" class="info"></div>
     <div class="legend">

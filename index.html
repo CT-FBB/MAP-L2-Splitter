@@ -57,13 +57,18 @@
 </head>
 <body>
 
-    <div class="tab-navigation">
-        <button class="tab-btn active" onclick="switchTab(this, 'iframe-main')">🔍 L2MAP (Splitters Search)</button>
-        <button class="tab-btn" onclick="switchTab(this, 'iframe-vendor')">📊 L2 Vendor Distribution</button>
+    <div class="tab-navigation" style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex;">
+            <button class="tab-btn active" onclick="switchTab(this, 'iframe-main')">🔍 L2MAP (Splitters Search)</button>
+            <button class="tab-btn" onclick="switchTab(this, 'iframe-vendor')">📊 L2 Vendor Distribution</button>
+        </div>
+        <div style="padding-right: 10px;">
+            <span style="background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(99, 102, 241, 0.35); color: #a5b4fc; padding: 4px 14px; border-radius: 20px; font-size: 0.8rem; font-family: 'Outfit', sans-serif; font-weight: 600; letter-spacing: 0.04em;">📅 AS OF 24/09/26</span>
+        </div>
     </div>
 
-    <iframe id="iframe-main" src="olt_map.html?v=7" class="active"></iframe>
-    <iframe id="iframe-vendor" src="choropleth_map.html?v=7"></iframe>
+    <iframe id="iframe-main" src="olt_map.html?v=20260924" class="active"></iframe>
+    <iframe id="iframe-vendor" src="choropleth_map.html?v=20260924"></iframe>
 
     <script>
         function switchTab(btn, iframeId) {
