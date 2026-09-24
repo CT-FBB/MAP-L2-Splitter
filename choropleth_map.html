@@ -134,11 +134,24 @@
 
         const map = L.map('map').setView([13.736717, 100.523186], 6);
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-            subdomains: 'abcd',
-            maxZoom: 19
-        }).addTo(map);
+        const googleRoadmap = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+            maxZoom: 19,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: '&copy; Google Maps'
+        });
+
+        const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            subdomains: 'abc',
+            attribution: '&copy; OpenStreetMap contributors'
+        });
+
+        googleRoadmap.addTo(map);
+
+        L.control.layers({
+            "🗺️ Google Maps": googleRoadmap,
+            "🌍 OpenStreetMap": osmLayer
+        }, null, { position: 'topright' }).addTo(map);
 
         let geojson;
         const infoBox = document.getElementById('info-box');
@@ -157,8 +170,6 @@
                 lookupName = 'BMA';
             } else if (['CHACHOENGSAO', 'CHON BURI', 'RAYONG'].includes(provName)) {
                 lookupName = 'EEC';
-            } else if (provName === 'NAAN') {
-                lookupName = 'NAN'; // GeoJSON spells Nan as 'Naan'
             }
 
             let html = `<h4>${props.shapeName}</h4>`;
@@ -204,8 +215,6 @@
                 lookupName = 'BMA';
             } else if (['CHACHOENGSAO', 'CHON BURI', 'RAYONG'].includes(provName)) {
                 lookupName = 'EEC';
-            } else if (provName === 'NAAN') {
-                lookupName = 'NAN'; // GeoJSON spells Nan as 'Naan'
             }
 
             let fillColor = '#ffffff'; // default
